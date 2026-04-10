@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GLP-1 Simple Tracker — Track Your Progress</title>
+<meta name="description" content="A simple, calming tool to track your GLP-1 medication progress, side effects, and dosage history.">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+  :root{
+    --bg:#f8faf8;
+    --surface:#ffffff;
+    --surface-hover:#f1f7f2;
+    --border:#e2ece4;
+    --border-focus:#8cc29a;
+    --primary:#4a9e64;
+    --primary-soft:#e8f5ec;
+    --primary-dark:#3a7e50;
+    --primary-glow:rgba(74,158,100,.15);
+    --text:#2c3e30;
+    --text-secondary:#6b8572;
+    --text-muted:#9aafa0;
+    --danger:#e05252;
+    --danger-soft:#fdeaea;
+    --warning-text:#b5880a;
+    --warning-bg:#fef9eb;
+    --warning-border:#f0dfa0;
+    --insight-bg:#f0f7f2;
+    --insight-border:#c8e2cf;
+    --guide-bg:linear-gradient(135deg,#f0f9f3 0%,#e6f4eb 100%);
+    --cta-bg:linear-gradient(135deg,#f7faf8 0%,#edf6f0 100%);
+    --modal-overlay:rgba(30,50,35,.45);
+    --shadow-sm:0 1px 3px rgba(44,62,48,.06);
+    --shadow-md:0 4px 16px rgba(44,62,48,.08);
+    --shadow-lg:0 8px 32px rgba(44,62,48,.12);
+    --shadow-xl:0 20px 60px rgba(44,62,48,.18);
+    --radius:14px;
+    --radius-sm:10px;
+    --radius-lg:18px;
+    --transition:0.25s cubic-bezier(.4,0,.2,1);
+  }
+
+  html{font-size:16px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+
+  body{
+    font-family:"Segoe UI","SF Pro Display",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh;
+    padding-bottom:env(safe-area-inset-bottom,0);
+  }
+
+  body::before,body::after{
+    content:"";position:fixed;border-radius:50%;filter:blur(80px);opacity:.3;z-index:-1;pointer-events:none;
+    animation:floatBlob 20s ease-in-out infinite alternate;
+  }
+  body::before{width:320px;height:320px;background:radial-gradient(circle,#b6e6c4,transparent);top:-60px;left:-80px}
+  body::after{width:260px;height:260px;background:radial-gradient(circle,#c3e8d0,transparent);bottom:40px;right:-60px;animation-delay:-10s}
+  @keyframes floatBlob{0%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,20px) scale(1.08)}100%{transform:translate(-20px,40px) scale(.95)}}
+
+  .container{max-width:480px;margin:0 auto;padding:20px 16px 40px}
+
+  /* ── Header ── */
+  .header{text-align:center;padding:36px 0 8px;animation:fadeSlideIn .6s ease-out}
+  .header-icon{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#4a9e64,#68bf82);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px;box-shadow:0 4px 20px rgba(74,158,100,.25)}
+  .header-icon svg{width:28px;height:28px;fill:#fff}
+  .header h1{font-size:1.55rem;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+  .header .tagline{font-size:.875rem;color:var(--text-muted);margin-top:6px;font-weight:400;font-style:italic;letter-spacing:.01em}
+
+  /* ── Quick Start Guide ── */
+  .guide-card{background:var(--guide-bg);border:1.5px solid var(--insight-border);border-radius:var(--radius);padding:22px 20px 18px;margin-top:18px;position:relative;animation:fadeSlideIn .5s ease-out .05s both;overflow:hidden}
+  .guide-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#4a9e64,#68bf82,#8dd4a0);border-radius:var(--radius) var(--radius) 0 0}
+  .guide-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .guide-title{font-size:.85rem;font-weight:700;color:var(--primary-dark);display:flex;align-items:center;gap:8px}
+  .guide-title svg{width:18px;height:18px;flex-shrink:0}
+  .guide-dismiss{background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;border-radius:8px;transition:all var(--transition);display:flex;align-items:center}
+  .guide-dismiss:hover{color:var(--text);background:rgba(0,0,0,.05)}
+  .guide-dismiss svg{width:16px;height:16px}
+  .guide-steps{list-style:none;display:flex;flex-direction:column;gap:10px}
+  .guide-step{display:flex;align-items:flex-start;gap:12px;font-size:.84rem;color:var(--text-secondary);line-height:1.5}
+  .step-num{width:24px;height:24px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;flex-shrink:0;box-shadow:0 2px 8px rgba(74,158,100,.25)}
+  .step-text{padding-top:2px}
+  .step-text strong{color:var(--text);font-weight:600}
+  .guide-footer{margin-top:14px;padding-top:12px;border-top:1px solid rgba(74,158,100,.15);font-size:.78rem;color:var(--text-muted);font-style:italic;text-align:center}
+  .guide-card.dismissed{max-height:0;padding:0 20px;margin-top:0;border-width:0;opacity:0;transition:all .4s cubic-bezier(.4,0,.2,1)}
+
+  /* ── Cards ── */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px 20px;margin-top:18px;box-shadow:var(--shadow-sm);transition:box-shadow var(--transition),transform var(--transition);animation:fadeSlideIn .5s ease-out both}
+  .card:hover{box-shadow:var(--shadow-md)}
+  .card-title{font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-secondary);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .card-title .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+  .dot-green{background:#4a9e64}.dot-blue{background:#5b8fd4}.dot-amber{background:#d4a03e}.dot-purple{background:#9b7dd4}
+
+  .micro-hint{font-size:.78rem;color:var(--text-muted);margin-bottom:14px;font-style:italic;line-height:1.45;padding-left:16px}
+
+  /* ── Validation warning ── */
+  .input-warning{
+    font-size:.78rem;color:var(--warning-text);background:var(--warning-bg);
+    border:1px solid var(--warning-border);border-radius:8px;
+    padding:8px 12px;margin-top:8px;display:none;
+    animation:fadeIn .25s ease-out;line-height:1.4;
+  }
+  .input-warning.visible{display:block}
+
+  /* ── Inputs ── */
+  .input-row{display:flex;gap:10px;align-items:stretch}
+  input[type="number"],input[type="text"],select{flex:1;padding:12px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:.95rem;font-family:inherit;color:var(--text);background:var(--surface);outline:none;transition:border-color var(--transition),box-shadow var(--transition);-moz-appearance:textfield}
+  input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  input:focus,select:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(74,158,100,.12)}
+  input::placeholder{color:var(--text-muted);font-weight:400}
+  input.input-error{border-color:var(--danger);box-shadow:0 0 0 3px rgba(224,82,82,.1)}
+  select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b8572' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+
+  /* ── Buttons ── */
+  .btn{padding:12px 20px;border:none;border-radius:var(--radius-sm);font-size:.875rem;font-weight:600;font-family:inherit;cursor:pointer;transition:all var(--transition);display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+  .btn-primary{background:linear-gradient(135deg,#4a9e64,#5ab872);color:#fff;box-shadow:0 2px 10px rgba(74,158,100,.25)}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(74,158,100,.35)}
+  .btn-primary:active{transform:translateY(0);box-shadow:0 1px 6px rgba(74,158,100,.2)}
+  .btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text-secondary)}
+  .btn-outline:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
+  .btn-soft{background:var(--primary-soft);color:var(--primary-dark);border:1.5px solid var(--insight-border)}
+  .btn-soft:hover{background:#ddf0e2;border-color:var(--primary);transform:translateY(-1px)}
+  .btn-block{width:100%;margin-top:14px}
+
+  /* ── Checkboxes ── */
+  .checkbox-group{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:4px}
+  .cb-label{display:flex;align-items:center;gap:8px;padding:10px 16px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:.875rem;font-weight:500;color:var(--text-secondary);transition:all var(--transition);user-select:none;flex:1;min-width:120px}
+  .cb-label:hover{border-color:var(--border-focus);background:var(--surface-hover)}
+  .cb-label input{display:none}
+  .cb-check{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;transition:all var(--transition);flex-shrink:0}
+  .cb-check svg{opacity:0;transform:scale(.5);transition:all var(--transition);width:12px;height:12px}
+  .cb-label input:checked ~ .cb-check{background:var(--primary);border-color:var(--primary)}
+  .cb-label input:checked ~ .cb-check svg{opacity:1;transform:scale(1)}
+  .cb-label input:checked ~ .cb-text{color:var(--text)}
+
+  /* ── History ── */
+  .history{margin-top:16px}
+  .history-title{font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px}
+  .history-list{list-style:none}
+  .history-item{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-radius:var(--radius-sm);margin-bottom:6px;background:var(--surface-hover);border:1px solid transparent;transition:all var(--transition);animation:fadeIn .3s ease-out}
+  .history-item:hover{border-color:var(--border)}
+  .history-item .date{font-size:.75rem;color:var(--text-muted);font-weight:500}
+  .history-item .value{font-size:.9rem;font-weight:600;color:var(--text)}
+  .history-item .tags{display:flex;gap:5px;flex-wrap:wrap}
+  .tag{font-size:.7rem;font-weight:600;padding:3px 9px;border-radius:20px;background:var(--primary-soft);color:var(--primary-dark)}
+  .history-item .delete-btn{background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;border-radius:6px;transition:all var(--transition);opacity:0;display:flex;align-items:center}
+  .history-item:hover .delete-btn{opacity:1}
+  .history-item .delete-btn:hover{color:var(--danger);background:var(--danger-soft)}
+  .history-item .delete-btn svg{width:14px;height:14px}
+  .empty-state{text-align:center;padding:20px;color:var(--text-muted);font-size:.85rem;font-style:italic}
+
+  /* ── Insights ── */
+  .insights-card{background:var(--surface);border:1.5px solid var(--insight-border);border-radius:var(--radius);padding:22px 20px;margin-top:18px;box-shadow:var(--shadow-sm);animation:fadeSlideIn .5s ease-out .3s both}
+  .insights-title{font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--primary-dark);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  .insights-title svg{width:16px;height:16px}
+  .insight-row{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:var(--radius-sm);background:var(--insight-bg);margin-bottom:8px;animation:fadeIn .35s ease-out;border:1px solid transparent;transition:border-color var(--transition)}
+  .insight-row:hover{border-color:var(--insight-border)}
+  .insight-row:last-child{margin-bottom:0}
+  .insight-icon{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .insight-icon svg{width:16px;height:16px}
+  .insight-icon.green{background:rgba(74,158,100,.12)}.insight-icon.green svg{fill:#4a9e64;stroke:#4a9e64}
+  .insight-icon.amber{background:rgba(212,160,62,.12)}.insight-icon.amber svg{fill:#d4a03e;stroke:#d4a03e}
+  .insight-icon.blue{background:rgba(91,143,212,.12)}.insight-icon.blue svg{fill:#5b8fd4;stroke:#5b8fd4}
+  .insight-icon.purple{background:rgba(155,125,212,.12)}.insight-icon.purple svg{fill:#9b7dd4;stroke:#9b7dd4}
+  .insight-content{flex:1;min-width:0}
+  .insight-label{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:2px}
+  .insight-msg{font-size:.84rem;color:var(--text-secondary);line-height:1.5}
+  .insights-empty{text-align:center;padding:16px;color:var(--text-muted);font-size:.82rem;font-style:italic}
+
+  /* ── Progress Momentum ── */
+  .progress-msg{
+    text-align:center;padding:14px 16px;margin-top:18px;
+    background:var(--insight-bg);border:1px solid var(--insight-border);border-radius:var(--radius);
+    font-size:.82rem;color:var(--text-secondary);font-style:italic;line-height:1.5;
+    animation:fadeSlideIn .5s ease-out .25s both;
+  }
+
+  /* ── CTA Card ── */
+  .cta-card{background:var(--cta-bg);border:1.5px dashed var(--insight-border);border-radius:var(--radius);padding:24px 20px;margin-top:22px;text-align:center;animation:fadeSlideIn .5s ease-out .35s both;transition:border-color var(--transition),box-shadow var(--transition)}
+  .cta-card:hover{border-color:var(--primary);box-shadow:var(--shadow-sm)}
+  .cta-icon{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,rgba(74,158,100,.1),rgba(104,191,130,.15));display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px}
+  .cta-icon svg{width:20px;height:20px;stroke:var(--primary);fill:none}
+  .cta-text{font-size:.84rem;color:var(--text-secondary);line-height:1.55;margin-bottom:16px;max-width:340px;margin-left:auto;margin-right:auto}
+  .cta-text strong{color:var(--text);font-weight:600}
+
+  /* ── Export Section ── */
+  .export-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:22px 20px;margin-top:18px;box-shadow:var(--shadow-sm);
+    animation:fadeSlideIn .5s ease-out .38s both;
+  }
+  .export-card-title{font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-secondary);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .export-btns{display:flex;flex-direction:column;gap:10px}
+  .export-btns .btn{width:100%;justify-content:center}
+  .export-note{font-size:.75rem;color:var(--text-muted);text-align:center;margin-top:14px;line-height:1.5;padding-top:12px;border-top:1px solid var(--border)}
+
+  /* ── Save feedback banner ── */
+  .save-feedback{
+    position:fixed;top:0;left:0;right:0;
+    background:linear-gradient(135deg,#4a9e64,#5ab872);color:#fff;text-align:center;
+    padding:14px 20px;font-size:.85rem;font-weight:600;z-index:200;
+    transform:translateY(-100%);opacity:0;transition:all .4s cubic-bezier(.4,0,.2,1);
+    box-shadow:0 4px 20px rgba(74,158,100,.3);letter-spacing:.01em;
+  }
+  .save-feedback.show{transform:translateY(0);opacity:1}
+  .save-feedback .feedback-sub{font-size:.75rem;font-weight:400;opacity:.85;margin-top:2px}
+
+  /* ── Modal ── */
+  .modal-overlay{position:fixed;inset:0;background:var(--modal-overlay);z-index:300;display:flex;align-items:flex-end;justify-content:center;opacity:0;visibility:hidden;transition:all .35s cubic-bezier(.4,0,.2,1);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+  .modal-overlay.open{opacity:1;visibility:visible}
+  .modal-overlay.open .modal-sheet{transform:translateY(0)}
+  .modal-sheet{background:var(--surface);border-radius:var(--radius-lg) var(--radius-lg) 0 0;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;padding:28px 24px 36px;box-shadow:var(--shadow-xl);transform:translateY(100%);transition:transform .4s cubic-bezier(.22,1,.36,1)}
+  .modal-handle{width:36px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 20px}
+  .modal-close{position:absolute;top:16px;right:18px;background:none;border:none;cursor:pointer;color:var(--text-muted);padding:6px;border-radius:8px;transition:all var(--transition);display:flex;align-items:center}
+  .modal-close:hover{color:var(--text);background:var(--surface-hover)}
+  .modal-close svg{width:18px;height:18px}
+  .modal-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:linear-gradient(135deg,#e8f5ec,#d5eddc);color:var(--primary-dark);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
+  .modal-badge svg{width:12px;height:12px}
+  .modal-title{font-size:1.2rem;font-weight:700;color:var(--text);margin-bottom:6px;letter-spacing:-.01em;line-height:1.3}
+  .modal-subtitle{font-size:.84rem;color:var(--text-muted);margin-bottom:22px;line-height:1.5}
+  .modal-features{list-style:none;display:flex;flex-direction:column;gap:12px;margin-bottom:24px}
+  .modal-feature{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:var(--radius-sm);background:var(--surface-hover);font-size:.84rem;color:var(--text-secondary);line-height:1.5}
+  .modal-feature-icon{width:28px;height:28px;border-radius:8px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .modal-feature-icon svg{width:14px;height:14px;stroke:var(--primary);fill:none}
+  .modal-divider{height:1px;background:var(--border);margin:24px 0}
+  .modal-feedback-title{font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:14px;text-align:center}
+  .feedback-options{display:flex;flex-direction:column;gap:8px}
+  .feedback-option{display:flex;align-items:center;gap:10px;padding:13px 16px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:.85rem;font-weight:500;color:var(--text-secondary);background:var(--surface);transition:all var(--transition);user-select:none}
+  .feedback-option:hover{border-color:var(--border-focus);background:var(--surface-hover);color:var(--text)}
+  .feedback-option.selected{border-color:var(--primary);background:var(--primary-soft);color:var(--primary-dark)}
+  .feedback-option .fb-radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all var(--transition)}
+  .feedback-option .fb-radio::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--primary);transform:scale(0);transition:transform var(--transition)}
+  .feedback-option.selected .fb-radio{border-color:var(--primary)}
+  .feedback-option.selected .fb-radio::after{transform:scale(1)}
+  .feedback-thanks{text-align:center;padding:24px 16px;animation:fadeSlideIn .4s ease-out}
+  .feedback-thanks-icon{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#4a9e64,#68bf82);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px;box-shadow:0 4px 16px rgba(74,158,100,.25)}
+  .feedback-thanks-icon svg{width:24px;height:24px;stroke:#fff;fill:none}
+  .feedback-thanks h3{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:6px}
+  .feedback-thanks p{font-size:.84rem;color:var(--text-muted);line-height:1.5}
+
+  /* ── Footer ── */
+  .footer{text-align:center;margin-top:32px;padding:20px 0 8px;font-size:.75rem;color:var(--text-muted);line-height:1.5;border-top:1px solid var(--border);animation:fadeSlideIn .5s ease-out .42s both}
+
+  /* ── Toast ── */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--text);color:#fff;padding:12px 24px;border-radius:12px;font-size:.85rem;font-weight:500;box-shadow:var(--shadow-lg);opacity:0;transition:all .35s cubic-bezier(.4,0,.2,1);z-index:100;pointer-events:none;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ── Animations ── */
+  @keyframes fadeSlideIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes pulseOnce{0%{box-shadow:var(--shadow-sm)}50%{box-shadow:0 0 0 6px var(--primary-glow),var(--shadow-md)}100%{box-shadow:var(--shadow-sm)}}
+  .pulse-highlight{animation:pulseOnce .8s ease-out}
+
+  /* ── Responsive ── */
+  @media(max-width:400px){
+    .container{padding:16px 12px 32px}
+    .card,.guide-card,.insights-card,.cta-card,.export-card{padding:18px 16px}
+    .checkbox-group{gap:8px}
+    .cb-label{min-width:100px;padding:9px 12px;font-size:.82rem}
+    .guide-step{font-size:.8rem}
+    .insight-row{padding:10px 12px}
+    .modal-sheet{padding:24px 18px 32px}
+  }
+
+  ::-webkit-scrollbar{width:4px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+  /* ── Print Styles (PDF Report) ── */
+  @media print{
+    body{background:#fff!important;padding:0!important}
+    body::before,body::after{display:none!important}
+    .save-feedback,.toast,.guide-card,.cta-card,.modal-overlay,
+    .export-card,.btn,.input-row,.checkbox-group,.delete-btn,
+    .guide-dismiss,.micro-hint,.input-warning{display:none!important}
+    .container{max-width:100%;padding:0 20px}
+    .card,.insights-card{box-shadow:none!important;border:1px solid #ddd!important;break-inside:avoid;margin-top:16px!important}
+    .header{padding-top:10px!important}
+    .header-icon{box-shadow:none!important}
+    .footer{border-top:1px solid #ddd!important}
+    .history-item{background:#f9f9f9!important;border:1px solid #eee!important}
+    .history-item .delete-btn{display:none!important}
+    .print-header{display:block!important;text-align:center;padding:20px 0 10px;border-bottom:2px solid #4a9e64;margin-bottom:10px}
+    .print-header h2{font-size:1.3rem;font-weight:700;color:#2c3e30}
+    .print-header p{font-size:.8rem;color:#6b8572;margin-top:4px}
+  }
+  .print-header{display:none}
+</style>
+</head>
+<body>
+
+<!-- Save feedback banner -->
+<div class="save-feedback" id="save-feedback">
+  <div>Saved. You're building your progress step by step. ✓</div>
+  <div class="feedback-sub">Every entry helps you see the bigger picture.</div>
+</div>
+
+<div class="container" id="app">
+
+  <!-- Print-only header -->
+  <div class="print-header" id="print-header">
+    <h2>GLP-1 Progress Report</h2>
+    <p id="print-date"></p>
+  </div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+    </div>
+    <h1>GLP-1 Simple Tracker</h1>
+    <p class="tagline">Stay consistent. Progress takes time.</p>
+  </header>
+
+  <!-- Quick Start Guide -->
+  <div class="guide-card" id="guide-card">
+    <div class="guide-header">
+      <div class="guide-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        How to use this tracker
+      </div>
+      <button class="guide-dismiss" id="dismiss-guide-btn" onclick="dismissGuide()" aria-label="Dismiss guide">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <ol class="guide-steps">
+      <li class="guide-step"><span class="step-num">1</span><span class="step-text"><strong>Enter your weight</strong> once per day — consistency matters more than perfection</span></li>
+      <li class="guide-step"><span class="step-num">2</span><span class="step-text"><strong>Log your side effects</strong> — understanding patterns helps you feel in control</span></li>
+      <li class="guide-step"><span class="step-num">3</span><span class="step-text"><strong>Track your dose</strong> — keep a record of every dosage change</span></li>
+    </ol>
+    <div class="guide-footer">Stay consistent for a few days to start seeing patterns.</div>
+  </div>
+
+  <!-- Weight Card -->
+  <section class="card" id="weight-card">
+    <div class="card-title"><span class="dot dot-green"></span>Daily Weight</div>
+    <div class="micro-hint">Track your weight daily to notice trends over time</div>
+    <div class="input-row">
+      <input type="number" id="weight-input" placeholder="e.g. 185.4 lbs" step="0.1" min="30" max="700">
+      <button class="btn btn-primary" id="save-weight-btn" onclick="saveWeight()">Save</button>
+    </div>
+    <div class="input-warning" id="weight-warning">Please enter a realistic weight (between 30 and 700 lbs)</div>
+    <div class="history" id="weight-history"></div>
+  </section>
+
+  <!-- Side Effects Card -->
+  <section class="card" id="sideeffects-card">
+    <div class="card-title"><span class="dot dot-amber"></span>Side Effects Today</div>
+    <div class="micro-hint">Log symptoms to understand how your body reacts</div>
+    <div class="checkbox-group">
+      <label class="cb-label"><input type="checkbox" id="cb-nausea" value="Nausea"><span class="cb-check"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cb-text">Nausea</span></label>
+      <label class="cb-label"><input type="checkbox" id="cb-fatigue" value="Fatigue"><span class="cb-check"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cb-text">Fatigue</span></label>
+      <label class="cb-label"><input type="checkbox" id="cb-headache" value="Headache"><span class="cb-check"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cb-text">Headache</span></label>
+    </div>
+    <button class="btn btn-primary btn-block" id="save-effects-btn" onclick="saveSideEffects()">Save Today's Effects</button>
+    <div class="history" id="effects-history"></div>
+  </section>
+
+  <!-- Dose Log Card -->
+  <section class="card" id="dose-card">
+    <div class="card-title"><span class="dot dot-blue"></span>Dose Log</div>
+    <div class="micro-hint">Keep track of dosage changes as you progress</div>
+    <div class="input-row">
+      <select id="dose-select">
+        <option value="" disabled selected>Select dosage</option>
+        <option value="0.25mg">0.25 mg</option>
+        <option value="0.5mg">0.5 mg</option>
+        <option value="1.0mg">1.0 mg</option>
+        <option value="1.7mg">1.7 mg</option>
+        <option value="2.4mg">2.4 mg</option>
+      </select>
+      <button class="btn btn-primary" id="save-dose-btn" onclick="saveDose()">Log</button>
+    </div>
+    <div class="history" id="dose-history"></div>
+  </section>
+
+  <!-- Progress Momentum -->
+  <div class="progress-msg" id="progress-msg"></div>
+
+  <!-- Insights -->
+  <section class="insights-card" id="insights-card">
+    <div class="insights-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      Your Progress Insights
+    </div>
+    <div id="insights-content">
+      <div class="insights-empty">Start logging to see your personalized insights here.</div>
+    </div>
+  </section>
+
+  <!-- Soft CTA -->
+  <div class="cta-card" id="cta-card">
+    <div class="cta-icon">
+      <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+    </div>
+    <div class="cta-text">This is a <strong>simple version</strong> of the tracker. A more advanced version will help you understand your progress more deeply.</div>
+    <button class="btn btn-soft" id="see-coming-btn" onclick="openModal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 16 16 12 12 8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      See what's coming
+    </button>
+  </div>
+
+  <!-- Export Section -->
+  <div class="export-card" id="export-card">
+    <div class="export-card-title">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export Your Data
+    </div>
+    <div class="export-btns">
+      <button class="btn btn-outline" id="export-json-btn" onclick="exportJSON()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Export Data (JSON)
+      </button>
+      <button class="btn btn-outline" id="export-csv-btn" onclick="exportCSV()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+        Download Excel (CSV)
+      </button>
+      <button class="btn btn-outline" id="export-pdf-btn" onclick="exportPDF()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Download PDF Report
+      </button>
+    </div>
+    <div class="export-note">Your data is saved automatically in your browser.<br>You can download it anytime.</div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    This is a personal tracking tool. Not medical advice.<br>
+    Built with care for your journey.
+  </footer>
+</div>
+
+<!-- Coming Soon Modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)">
+  <div class="modal-sheet" id="modal-sheet">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal()" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div id="modal-body">
+      <div id="modal-page-coming">
+        <div class="modal-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Coming Soon</div>
+        <div class="modal-title">GLP-1 Clarity System</div>
+        <div class="modal-subtitle">We're building something that goes beyond tracking — helping you actually understand your progress.</div>
+        <ul class="modal-features">
+          <li class="modal-feature"><div class="modal-feature-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div><span>Understand <strong>why</strong> your weight isn't changing — not just that it isn't</span></li>
+          <li class="modal-feature"><div class="modal-feature-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><span>See <strong>patterns</strong> in side effects and understand what they mean</span></li>
+          <li class="modal-feature"><div class="modal-feature-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><span>Get <strong>simple explanations</strong> of your progress in plain language</span></li>
+        </ul>
+        <div class="modal-divider"></div>
+        <div class="modal-feedback-title">Help us build this for you</div>
+        <button class="btn btn-primary btn-block" onclick="showFeedbackPage()" id="modal-feedback-btn" style="margin-top:0">Tell me what would help you most</button>
+      </div>
+      <div id="modal-page-feedback" style="display:none">
+        <div class="modal-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Your Input</div>
+        <div class="modal-title">What matters most to you?</div>
+        <div class="modal-subtitle">Pick the one thing that would help you the most right now.</div>
+        <div class="feedback-options" id="feedback-options">
+          <div class="feedback-option" onclick="selectFeedback(this,'plateau')"><span class="fb-radio"></span><span>Understanding weight plateau</span></div>
+          <div class="feedback-option" onclick="selectFeedback(this,'patterns')"><span class="fb-radio"></span><span>Side effects patterns</span></div>
+          <div class="feedback-option" onclick="selectFeedback(this,'meals')"><span class="fb-radio"></span><span>Meal guidance</span></div>
+          <div class="feedback-option" onclick="selectFeedback(this,'consistency')"><span class="fb-radio"></span><span>Staying consistent</span></div>
+        </div>
+      </div>
+      <div id="modal-page-thanks" style="display:none">
+        <div class="feedback-thanks">
+          <div class="feedback-thanks-icon"><svg viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <h3>Got it. Thank you.</h3>
+          <p>I'm building this based on real needs — yours included. Stay tuned for something helpful.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  var KEYS = {
+    weight: 'glp1_weight',
+    effects: 'glp1_effects',
+    dose: 'glp1_dose',
+    guideDismissed: 'glp1_guide_dismissed',
+    feedback: 'glp1_feedback'
+  };
+
+  function getData(key) {
+    try { return JSON.parse(localStorage.getItem(key)) || []; }
+    catch(e) { return []; }
+  }
+  function setData(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
+  function formatDate(iso) { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+  function formatTime(iso) { return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
+
+  function toast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timeout);
+    t._timeout = setTimeout(function() { t.classList.remove('show'); }, 2200);
+  }
+
+  function showSaveFeedback() {
+    var fb = document.getElementById('save-feedback');
+    fb.classList.add('show');
+    clearTimeout(fb._timeout);
+    fb._timeout = setTimeout(function() { fb.classList.remove('show'); }, 2800);
+  }
+
+  function deleteSvg() {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+  }
+
+  function pulseCard(id) {
+    var el = document.getElementById(id);
+    el.classList.add('pulse-highlight');
+    setTimeout(function() { el.classList.remove('pulse-highlight'); }, 900);
+  }
+
+  // ── Guide ──
+  function dismissGuide() {
+    document.getElementById('guide-card').classList.add('dismissed');
+    localStorage.setItem(KEYS.guideDismissed, 'true');
+  }
+  function initGuide() {
+    if (localStorage.getItem(KEYS.guideDismissed) === 'true') {
+      document.getElementById('guide-card').style.display = 'none';
+    }
+  }
+
+  // ── Weight (with validation) ──
+  function saveWeight() {
+    var input = document.getElementById('weight-input');
+    var warning = document.getElementById('weight-warning');
+    var val = parseFloat(input.value);
+
+    // Clear previous warnings
+    warning.classList.remove('visible');
+    input.classList.remove('input-error');
+
+    if (!val || isNaN(val)) {
+      toast('Please enter a weight value');
+      return;
+    }
+    if (val < 30 || val > 700) {
+      warning.classList.add('visible');
+      input.classList.add('input-error');
+      return;
+    }
+
+    var data = getData(KEYS.weight);
+    data.unshift({ value: val, date: new Date().toISOString(), id: Date.now() });
+    setData(KEYS.weight, data);
+    input.value = '';
+    renderWeight();
+    showSaveFeedback();
+    renderInsights();
+    renderProgress();
+    pulseCard('weight-card');
+  }
+
+  // Clear warning on input focus
+  document.getElementById('weight-input').addEventListener('focus', function() {
+    document.getElementById('weight-warning').classList.remove('visible');
+    this.classList.remove('input-error');
+  });
+
+  function deleteWeight(id) {
+    setData(KEYS.weight, getData(KEYS.weight).filter(function(e) { return e.id !== id; }));
+    renderWeight();
+    renderInsights();
+    renderProgress();
+  }
+  function renderWeight() {
+    var data = getData(KEYS.weight);
+    var c = document.getElementById('weight-history');
+    if (!data.length) { c.innerHTML = '<div class="empty-state">No entries yet. Start tracking today.</div>'; return; }
+    var h = '<div class="history-title">Recent Entries</div><ul class="history-list">';
+    data.slice(0, 15).forEach(function(e) {
+      h += '<li class="history-item"><div><div class="value">' + e.value + ' lbs</div><div class="date">' + formatDate(e.date) + ' &middot; ' + formatTime(e.date) + '</div></div><button class="delete-btn" onclick="deleteWeight(' + e.id + ')" aria-label="Delete entry">' + deleteSvg() + '</button></li>';
+    });
+    c.innerHTML = h + '</ul>';
+  }
+
+  // ── Side Effects ──
+  function saveSideEffects() {
+    var checks = ['cb-nausea', 'cb-fatigue', 'cb-headache'];
+    var selected = checks.filter(function(id) { return document.getElementById(id).checked; }).map(function(id) { return document.getElementById(id).value; });
+    if (!selected.length) { toast('Select at least one side effect'); return; }
+    var data = getData(KEYS.effects);
+    data.unshift({ effects: selected, date: new Date().toISOString(), id: Date.now() });
+    setData(KEYS.effects, data);
+    checks.forEach(function(id) { document.getElementById(id).checked = false; });
+    renderEffects();
+    showSaveFeedback();
+    renderInsights();
+    renderProgress();
+    pulseCard('sideeffects-card');
+  }
+  function deleteEffect(id) {
+    setData(KEYS.effects, getData(KEYS.effects).filter(function(e) { return e.id !== id; }));
+    renderEffects();
+    renderInsights();
+    renderProgress();
+  }
+  function renderEffects() {
+    var data = getData(KEYS.effects);
+    var c = document.getElementById('effects-history');
+    if (!data.length) { c.innerHTML = '<div class="empty-state">No effects logged yet.</div>'; return; }
+    var h = '<div class="history-title">Recent Logs</div><ul class="history-list">';
+    data.slice(0, 15).forEach(function(e) {
+      var tags = e.effects.map(function(ef) { return '<span class="tag">' + ef + '</span>'; }).join('');
+      h += '<li class="history-item"><div><div class="tags">' + tags + '</div><div class="date">' + formatDate(e.date) + '</div></div><button class="delete-btn" onclick="deleteEffect(' + e.id + ')" aria-label="Delete entry">' + deleteSvg() + '</button></li>';
+    });
+    c.innerHTML = h + '</ul>';
+  }
+
+  // ── Dose ──
+  function saveDose() {
+    var sel = document.getElementById('dose-select');
+    var val = sel.value;
+    if (!val) { toast('Please select a dosage'); return; }
+    var data = getData(KEYS.dose);
+    data.unshift({ dosage: val, date: new Date().toISOString(), id: Date.now() });
+    setData(KEYS.dose, data);
+    sel.selectedIndex = 0;
+    renderDose();
+    showSaveFeedback();
+    renderInsights();
+    renderProgress();
+    pulseCard('dose-card');
+  }
+  function deleteDose(id) {
+    setData(KEYS.dose, getData(KEYS.dose).filter(function(e) { return e.id !== id; }));
+    renderDose();
+    renderInsights();
+    renderProgress();
+  }
+  function renderDose() {
+    var data = getData(KEYS.dose);
+    var c = document.getElementById('dose-history');
+    if (!data.length) { c.innerHTML = '<div class="empty-state">No doses logged yet.</div>'; return; }
+    var h = '<div class="history-title">Dose History</div><ul class="history-list">';
+    data.slice(0, 15).forEach(function(e) {
+      h += '<li class="history-item"><div><div class="value">' + e.dosage + '</div><div class="date">' + formatDate(e.date) + ' &middot; ' + formatTime(e.date) + '</div></div><button class="delete-btn" onclick="deleteDose(' + e.id + ')" aria-label="Delete entry">' + deleteSvg() + '</button></li>';
+    });
+    c.innerHTML = h + '</ul>';
+  }
+
+  // ── Progress Momentum ──
+  function renderProgress() {
+    var total = getData(KEYS.weight).length + getData(KEYS.effects).length + getData(KEYS.dose).length;
+    var el = document.getElementById('progress-msg');
+    if (total === 0) {
+      el.style.display = 'none';
+      return;
+    }
+    el.style.display = '';
+    if (total < 3) {
+      el.textContent = "You\u2019re just getting started. Keep tracking for a few days to see patterns emerge.";
+    } else if (total < 8) {
+      el.textContent = "You\u2019re building a clear picture of your progress. Every log counts.";
+    } else {
+      el.textContent = "You\u2019ve built a strong tracking habit. Your data is telling a story \u2014 keep going.";
+    }
+  }
+
+  // ── Smart Insights (Humanized) ──
+  function renderInsights() {
+    var weights = getData(KEYS.weight);
+    var effects = getData(KEYS.effects);
+    var doses = getData(KEYS.dose);
+    var container = document.getElementById('insights-content');
+
+    if (!weights.length && !effects.length && !doses.length) {
+      container.innerHTML = '<div class="insights-empty">Start logging to see your personalized insights here.</div>';
+      return;
+    }
+
+    var html = '';
+
+    // Weight
+    if (weights.length >= 2) {
+      var latest = weights[0].value;
+      var oldest = weights[weights.length - 1].value;
+      var msg, icon;
+      if (latest < oldest) {
+        var diff = (oldest - latest).toFixed(1);
+        msg = "You\u2019re heading in the right direction \u2014 down " + diff + " lbs since you started. That\u2019s real progress, even if it feels slow. Keep showing up for yourself.";
+        icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>';
+      } else if (latest === oldest) {
+        msg = "Your weight is holding steady. This is completely normal, especially early on. Your body is adjusting \u2014 the scale doesn\u2019t always reflect what\u2019s happening inside.";
+        icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+      } else {
+        msg = "You\u2019re still early in the process. Many people don\u2019t see changes immediately \u2014 consistency is what matters. Your body needs time to respond, and that\u2019s okay.";
+        icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+      }
+      html += '<div class="insight-row"><div class="insight-icon green">' + icon + '</div><div class="insight-content"><div class="insight-label">Weight Trend</div><div class="insight-msg">' + msg + '</div></div></div>';
+    } else if (weights.length === 1) {
+      html += '<div class="insight-row"><div class="insight-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div class="insight-content"><div class="insight-label">Weight Trend</div><div class="insight-msg">Great first step! Log a few more days and you\u2019ll start seeing your personal trend take shape.</div></div></div>';
+    }
+
+    // Side effects
+    if (effects.length > 0) {
+      var msg2;
+      if (effects.length >= 5) {
+        var counts = {};
+        effects.forEach(function(e) { e.effects.forEach(function(ef) { counts[ef] = (counts[ef] || 0) + 1; }); });
+        var sorted = Object.entries(counts).sort(function(a, b) { return b[1] - a[1]; });
+        msg2 = "You\u2019re experiencing recurring side effects \u2014 \"" + sorted[0][0] + "\" shows up most often (" + sorted[0][1] + " times). This kind of pattern is exactly what helps you and your provider have better conversations.";
+      } else if (effects.length >= 2) {
+        msg2 = "You\u2019re building a helpful picture of how your body is responding. Keep logging \u2014 patterns become clearer over time and can guide important conversations with your healthcare provider.";
+      } else {
+        msg2 = "Side effects seem minimal so far, which is a positive sign. Keep logging even on days when you feel fine \u2014 that\u2019s useful data too.";
+      }
+      html += '<div class="insight-row"><div class="insight-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><div class="insight-content"><div class="insight-label">Side Effects</div><div class="insight-msg">' + msg2 + '</div></div></div>';
+    }
+
+    // Dose
+    if (doses.length > 0) {
+      var latestDose = doses[0].dosage;
+      var doseVal = parseFloat(latestDose);
+      var msg3;
+      if (doseVal <= 0.5) {
+        msg3 = "You\u2019re in the early stages of dosing. This period is about letting your body adjust at its own pace. Changes can be subtle \u2014 that\u2019s perfectly normal.";
+      } else {
+        msg3 = "You\u2019re at a higher dose where many people start noticing more significant changes. Be patient with yourself and keep tracking \u2014 you\u2019re doing the right thing.";
+      }
+      if (doses.length >= 2 && doses[1].dosage !== latestDose) {
+        msg3 += " You recently moved from " + doses[1].dosage + " to " + latestDose + " \u2014 give your body a few weeks to settle in.";
+      }
+      html += '<div class="insight-row"><div class="insight-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="insight-content"><div class="insight-label">Dosage</div><div class="insight-msg">' + msg3 + '</div></div></div>';
+    }
+
+    container.innerHTML = html;
+  }
+
+  // ── Modal ──
+  function openModal() {
+    var overlay = document.getElementById('modal-overlay');
+    var existing = localStorage.getItem(KEYS.feedback);
+    document.getElementById('modal-page-coming').style.display = '';
+    document.getElementById('modal-page-feedback').style.display = 'none';
+    document.getElementById('modal-page-thanks').style.display = 'none';
+    if (existing) {
+      document.getElementById('modal-page-coming').style.display = 'none';
+      document.getElementById('modal-page-thanks').style.display = '';
+    }
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  function handleOverlayClick(e) {
+    if (e.target === document.getElementById('modal-overlay')) closeModal();
+  }
+  function showFeedbackPage() {
+    document.getElementById('modal-page-coming').style.display = 'none';
+    document.getElementById('modal-page-feedback').style.display = '';
+    document.querySelectorAll('.feedback-option').forEach(function(el) { el.classList.remove('selected'); });
+  }
+  function selectFeedback(el, value) {
+    document.querySelectorAll('.feedback-option').forEach(function(o) { o.classList.remove('selected'); });
+    el.classList.add('selected');
+    var feedbackData = {
+      choice: value,
+      label: el.querySelector('span:last-child').textContent,
+      date: new Date().toISOString()
+    };
+    localStorage.setItem(KEYS.feedback, JSON.stringify(feedbackData));
+    setTimeout(function() {
+      document.getElementById('modal-page-feedback').style.display = 'none';
+      document.getElementById('modal-page-thanks').style.display = '';
+    }, 600);
+  }
+
+  // ── Export JSON ──
+  function exportJSON() {
+    var payload = {
+      exportDate: new Date().toISOString(),
+      weight: getData(KEYS.weight),
+      sideEffects: getData(KEYS.effects),
+      doses: getData(KEYS.dose)
+    };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'glp1-tracker-export-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('JSON exported \u2713');
+  }
+
+  // ── Export CSV ──
+  function exportCSV() {
+    var weights = getData(KEYS.weight);
+    var effects = getData(KEYS.effects);
+    var doses = getData(KEYS.dose);
+
+    // Build a unified timeline
+    var rows = [];
+    var dateMap = {};
+
+    weights.forEach(function(w) {
+      var d = w.date.slice(0, 10);
+      if (!dateMap[d]) dateMap[d] = { date: d, weight: '', effects: '', dose: '' };
+      dateMap[d].weight = w.value;
+    });
+    effects.forEach(function(e) {
+      var d = e.date.slice(0, 10);
+      if (!dateMap[d]) dateMap[d] = { date: d, weight: '', effects: '', dose: '' };
+      dateMap[d].effects = e.effects.join('; ');
+    });
+    doses.forEach(function(ds) {
+      var d = ds.date.slice(0, 10);
+      if (!dateMap[d]) dateMap[d] = { date: d, weight: '', effects: '', dose: '' };
+      dateMap[d].dose = ds.dosage;
+    });
+
+    var sortedDates = Object.keys(dateMap).sort().reverse();
+    var csv = 'Date,Weight (lbs),Side Effects,Dose\n';
+    sortedDates.forEach(function(d) {
+      var r = dateMap[d];
+      csv += '"' + d + '","' + r.weight + '","' + r.effects + '","' + r.dose + '"\n';
+    });
+
+    if (sortedDates.length === 0) {
+      toast('No data to export yet');
+      return;
+    }
+
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'glp1_data.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('CSV downloaded \u2713');
+  }
+
+  // ── Export PDF (Print) ──
+  function exportPDF() {
+    var weights = getData(KEYS.weight);
+    var effects = getData(KEYS.effects);
+    var doses = getData(KEYS.dose);
+
+    if (!weights.length && !effects.length && !doses.length) {
+      toast('No data to include in report');
+      return;
+    }
+
+    // Set print date
+    document.getElementById('print-date').textContent = 'Generated on ' + new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    // Trigger print dialog
+    window.print();
+    toast('PDF report ready \u2713');
+  }
+
+  // ── Keyboard support ──
+  document.getElementById('weight-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') saveWeight(); });
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
+
+  // ── Init ──
+  initGuide();
+  renderWeight();
+  renderEffects();
+  renderDose();
+  renderInsights();
+  renderProgress();
+</script>
+
+</body>
+</html>
